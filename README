@@ -1,0 +1,39 @@
+alert drive
+===========
+
+a system to alert drowsy drivers and keep them up
+
+setup
+-----
+
+# clone repository
+$ git clone https://github.com/virajsazzala/alert-drive.git
+
+# step into dir
+$ cd alert-drive
+
+# make a virtual environment
+$ python3 -m venv .venv
+
+# activate virtual environment
+$ source .venv/bin/activate
+
+# install deps
+$ pip install ./requirements.txt
+
+# download pre-trained shape predictor
+$ wget http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
+
+Note: extract the folder and move the dat file to data/ dir
+
+usage (under dev)
+-----------------
+
+# to detect drowsiness
+$ python3 ./src/vision/detect.py
+
+# to track logs
+$ watch -n 1 tail ./eye-status.log 
+
+Note: this project is under development, expect breaking changes
+
