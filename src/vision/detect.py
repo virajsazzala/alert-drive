@@ -4,9 +4,12 @@ import time
 import logging
 import numpy as np
 
-logging.basicConfig(level=logging.DEBUG, 
-                    format='%(asctime)s - %(levelname)s - %(message)s',
-                    handlers=[logging.FileHandler('eye-status.log')])
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler("eye-status.log")],
+)
+
 
 def calc_eye(eye):
     a = np.linalg.norm(eye[1] - eye[5])
