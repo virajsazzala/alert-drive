@@ -2,7 +2,6 @@ import os
 import pygame
 import logging
 from consts import VOICE_DATA
-from pathlib import Path
 import speech_recognition as sr
 
 
@@ -52,7 +51,3 @@ def listen():
             return text.lower()
         except Exception as e:
             raise Exception(str(e))
-
-
-# listen()
-# say("i am talking slowly, because i am a dumb fuck. what do i do with my life? i don't know.")
