@@ -5,6 +5,62 @@ import logging
 import numpy as np
 from ctransformers import AutoModelForCausalLM
 
+import re
+import os
+import pygame
+import logging
+from consts import VOICE_DATA
+import speech_recognition as sr
+
+
+# logging.basicConfig(
+#     level=logging.DEBUG,
+#     format="%(asctime)s - %(levelname)s - %(message)s",
+#     handlers=[logging.FileHandler("speech-status.log")],
+# )
+
+r = sr.Recognizer()
+
+
+def say(audio):
+    voice = "en-AU-NatashaNeural"
+    command = (
+        f'edge-tts --voice "{voice}" --text "{audio}" --write-media "{VOICE_DATA}"'
+    )
+    os.system(command)
+
+    pygame.init()
+    pygame.mixer.init()
+    pygame.mixer.music.load(VOICE_DATA)
+
+    try:
+        pygame.mixer.music.play()
+        while pygame.mixer.music.get_busy():
+            pygame.time.Clock().tick(10)
+    except Exception as e:
+        logging.critical(e)
+    finally:
+        pygame.mixer.music.stop()
+        pygame.mixer.quit()
+
+
+def listen():
+    with sr.Microphone() as source:
+        r.adjust_for_ambient_noise(source)
+        r.pause_threshold = 1
+        audio = r.listen(source)
+
+        try:
+            # NOTE: use recognize_google for faster but less accurate recognition. (set = language="en-US")
+            # NOTE: use recognize_whisper for slower but accurate recognition.
+            text = r.recognize_whisper(audio)
+            logging.info(f"you said: {text}")
+
+            return text.lower()
+        except Exception as e:
+            raise Exception(str(e))
+
+
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -21,7 +77,7 @@ def draw_eyes(frame, eye):
     cv2.polylines(frame, [eye], isClosed=True, color=(0, 255, 0), thickness=1)
 
 face_detector = dlib.get_frontal_face_detector()
-landmark_predictor = dlib.shape_predictor("../../data/shape-pred-face-landmarks.dat")
+landmark_predictor = dlib.shape_predictor("../data/shape-pred-face-landmarks.dat")
 
 cap = cv2.VideoCapture(0)
 
@@ -34,7 +90,7 @@ chatbot_duration = 300  # 5 minutes
 
 # Load the chat model
 chat_model = AutoModelForCausalLM.from_pretrained(
-    'llama-2-7b-chat.ggmlv3.q8_0.bin',
+    'vision/llama-2-7b-chat.ggmlv3.q8_0.bin',
     model_type='llama',
     temperature=0.1, 
     top_p=0.9,
@@ -46,7 +102,7 @@ messages = [{"role": "assistant", "content": "How may I assist you today?"}]
 
 def generate_response(user_input, chat_model):
     name = "rahul"
-    string_dialogue = f"You are a helpful assistant. You help drivers stay alert. The driver's name is {name}. You do not respond as 'User' or pretend to be 'User'. You only respond once as 'Assistant'."
+    string_dialogue = f"You are a helpful assistant. You help drivers stay alert. You do not respond as 'User' or pretend to be 'User'. You only respond once as 'Assistant'."
     
     # Append previous messages
     for message in messages:
@@ -83,10 +139,10 @@ while True:
                     # Trigger chatbot
                     chatbot_active = True
                     chatbot_start_time = time.time()
-                    print("Are you feeling sleepy? I can tell you a short story. Lemme think...")
-                    user_input = "I am feeling sleepy. Can you tell me a short story in under 500 characters?"
+                    say("Are you feeling sleepy? I can tell you a short story. Lemme think of one.")
+                    user_input = "I am feeling sleepy. Can you tell me a short story?"
                     response = generate_response(user_input, chat_model)
-                    print("Assistant:", response)
+                    say(response.replace("\n\n", " "))
                     messages.append({"role": "user", "content": user_input})
                     messages.append({"role": "assistant", "content": response})
                     eyes_detected = False
@@ -115,11 +171,11 @@ while True:
     if chatbot_active:
         user_input = input("You: ")
         messages.append({"role": "user", "content": user_input})
-        if user_input.lower() == "stop, i'm not sleepy anymore":
+        if re.search(r'\bstop\b.*\bnot\s+sleepy\b', user_input.lower(), re.IGNORECASE):
             chatbot_active = False
         else:
             response = generate_response(user_input, chat_model)
-            print("Assistant:", response)
+            say(response.replace("\n\n", " "))
             messages.append({"role": "assistant", "content": response})
             conversation_start_time = time.time()
 
