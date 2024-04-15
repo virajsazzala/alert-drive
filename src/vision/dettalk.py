@@ -12,12 +12,9 @@ import logging
 from consts import VOICE_DATA
 import speech_recognition as sr
 
-
-# logging.basicConfig(
-#     level=logging.DEBUG,
-#     format="%(asctime)s - %(levelname)s - %(message)s",
-#     handlers=[logging.FileHandler("speech-status.log")],
-# )
+from vosk import Model, KaldiRecognizer
+import pyaudio
+from consts import VOICE_MODEL
 
 r = sr.Recognizer()
 
@@ -45,6 +42,7 @@ def say(audio):
 
 
 def listen():
+    print("Listening...")
     with sr.Microphone() as source:
         r.adjust_for_ambient_noise(source)
         r.pause_threshold = 1
@@ -61,11 +59,37 @@ def listen():
             raise Exception(str(e))
 
 
+def lis():
+    mp = str(VOICE_MODEL.resolve())
+    model = Model(mp)
+    recognizer = KaldiRecognizer(model, 16000)
+
+    p = pyaudio.PyAudio()
+    stream = p.open(
+        format=pyaudio.paInt16,
+        channels=1,
+        rate=16000,
+        input=True,
+        frames_per_buffer=8000,
+    )
+    stream.start_stream()
+
+    while True:
+        data = stream.read(8000)
+        if recognizer.AcceptWaveform(data):
+            said = recognizer.Result()[14:-3]
+            if len(said) == 0:
+                break
+            print(said)
+            return said
+
+
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[logging.FileHandler("eye-status.log")],
 )
+
 
 def calc_eye(eye):
     a = np.linalg.norm(eye[1] - eye[5])
@@ -73,8 +97,10 @@ def calc_eye(eye):
     c = np.linalg.norm(eye[0] - eye[3])
     return (a + b) / (2 * c)
 
+
 def draw_eyes(frame, eye):
     cv2.polylines(frame, [eye], isClosed=True, color=(0, 255, 0), thickness=1)
+
 
 face_detector = dlib.get_frontal_face_detector()
 landmark_predictor = dlib.shape_predictor("../data/shape-pred-face-landmarks.dat")
@@ -90,30 +116,32 @@ chatbot_duration = 300  # 5 minutes
 
 # Load the chat model
 chat_model = AutoModelForCausalLM.from_pretrained(
-    'vision/llama-2-7b-chat.ggmlv3.q8_0.bin',
-    model_type='llama',
-    temperature=0.1, 
+    "vision/llama-2-7b-chat.ggmlv3.q8_0.bin",
+    model_type="llama",
+    temperature=0.1,
     top_p=0.9,
-    max_new_tokens = 1000,
-    context_length=6000
+    max_new_tokens=1000,
+    context_length=6000,
 )
 
 messages = [{"role": "assistant", "content": "How may I assist you today?"}]
 
+
 def generate_response(user_input, chat_model):
     name = "rahul"
     string_dialogue = f"You are a helpful assistant. You help drivers stay alert. You do not respond as 'User' or pretend to be 'User'. You only respond once as 'Assistant'."
-    
+
     # Append previous messages
     for message in messages:
         if message["role"] == "user":
             string_dialogue += f"User: {message['content']}\\n\\n"
         else:
             string_dialogue += f"Assistant: {message['content']}\\n\\n"
-    
+
     # Generate response
     output = chat_model(f"prompt {string_dialogue} {user_input} Assistant: ")
     return output
+
 
 while True:
     ret, frame = cap.read()
@@ -139,10 +167,13 @@ while True:
                     # Trigger chatbot
                     chatbot_active = True
                     chatbot_start_time = time.time()
-                    say("Are you feeling sleepy? I can tell you a short story. Lemme think of one.")
-                    user_input = "I am feeling sleepy. Can you tell me a short story?"
-                    response = generate_response(user_input, chat_model)
-                    say(response.replace("\n\n", " "))
+                    say(
+                        "Are you feeling sleepy? I can tell you a short story. Lemme think of one."
+                    )
+                    user_input = "I am feeling sleepy. Can you tell me a short story, not about driving?"
+                    # response = generate_response(user_input, chat_model)
+                    response = "a cat was running in the garden"
+                    say(response.replace("\ n \ n", " "))
                     messages.append({"role": "user", "content": user_input})
                     messages.append({"role": "assistant", "content": response})
                     eyes_detected = False
@@ -159,7 +190,11 @@ while True:
             chatbot_active = False
             conversation_start_time = time.time()
 
-    if not chatbot_active and conversation_start_time and time.time() - conversation_start_time > 600:
+    if (
+        not chatbot_active
+        and conversation_start_time
+        and time.time() - conversation_start_time > 600
+    ):
         eyes_detected = True
 
     cv2.imshow("alert drive", frame)
@@ -167,15 +202,17 @@ while True:
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
-    # Check for user input to stop talking or continue conversation
     if chatbot_active:
-        user_input = input("You: ")
+        # user_input = input("You: ")
+        user_input = lis()
         messages.append({"role": "user", "content": user_input})
-        if re.search(r'\bstop\b.*\bnot\s+sleepy\b', user_input.lower(), re.IGNORECASE):
+        if re.search(r"\bstop\b.*\bnot\s+sleepy\b", user_input.lower(), re.IGNORECASE):
             chatbot_active = False
+            say("Okay, I'm turning off now!.")
+            break
         else:
             response = generate_response(user_input, chat_model)
-            say(response.replace("\n\n", " "))
+            say(response.replace("\ n \ n", " "))
             messages.append({"role": "assistant", "content": response})
             conversation_start_time = time.time()
 

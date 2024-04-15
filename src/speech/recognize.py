@@ -39,15 +39,22 @@ def say(audio):
 def listen():
     with sr.Microphone() as source:
         r.adjust_for_ambient_noise(source)
+        r.energy_threshold = 41801
+        r.dynamic_energy_threshold = True
         r.pause_threshold = 1
         audio = r.listen(source)
 
         try:
             # NOTE: use recognize_google for faster but less accurate recognition. (set = language="en-US")
             # NOTE: use recognize_whisper for slower but accurate recognition.
-            text = r.recognize_whisper(audio)
+            text = r.recognize_google(audio)
             logging.info(f"you said: {text}")
 
             return text.lower()
         except Exception as e:
             raise Exception(str(e))
+
+while True:
+    print("listening...")
+    t = listen()
+    print(t)
